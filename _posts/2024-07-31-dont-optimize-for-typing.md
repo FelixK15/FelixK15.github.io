@@ -21,6 +21,8 @@ In my opinion, it puts unnecessary mental strain on the developer reading the co
 
 IMHO code should be optimized for ~~reading~~ ~~debugging~~ *navigation*. You want a codebase that's easy to navigate - a codebase that's easy to navigate is, in my experience, likewise easy to debug and easy to read. Omitting the use of `auto` (and template type deducation) is just a subset of the things I'm seeing in codebases that make them hard to navigate.
 
+
+### Code example
 What does that mean in practice?
 Let's consider this arbitrary code snippet that I just pulled out of thin air:
 ```cpp
@@ -124,6 +126,8 @@ void updateSQLDatabaseEntry(SqlDatabase* pDatabase, const database_arguments* pA
 ```
 Everything that was unclear by the previous example has been made explicit here.
 We know what `IDatabase` implementation we're working with, we know what the unit of the size of the data is, and we know if it's safe to modify the data from the `dataSet`.
+
+### Outro
 
 > *Note*: Yes, I know that the example could've been rewritten a million different ways to weaken my arguments here, but c'mon - nobody likes a party pooper, I hope that you know what I'm trying to say here :)
 
