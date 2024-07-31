@@ -1,7 +1,7 @@
 ---
 layout:   post
 title:    "The human typewriter, or why optimizing for typing is short-sighted"
-tags:     programming c
+tags:     programming c optimization
 category: Programming
 ---
 
