@@ -108,7 +108,7 @@ This is indirectly acknowledged by the decision to reduce the worker count to 8,
 
 As Dennis points out, this likely limits execution to P-Cores only. He’s right that Windows favors P-Cores when scheduling. However, **this accounts for only a tiny fraction of the performance gain**. The bigger win comes from higher per-thread utilization.
 
-### Implementation #2: Lockless thread pool — or the wasted core
+### Implementation #2: Lockless thread pool — the burning core!
 Dennis correctly identifies the issue of workers sleeping between jobs because of the high contention of the job queue mutex and switches to a spin-wait strategy to keep cores active until the work is done.
 
 The revised implementation:
@@ -132,8 +132,40 @@ Surely, there are other things that the main thread could be doing. Two possibil
 - Let the main thread help execute jobs until the queue is empty, and only then enter a waiting state until all workers are finished, too
 - Or actively put the main thread into a wait state until all work is done via something like [`WaitForMultipleObjects()`](https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-waitformultipleobjects), each worker could set a [windows event](https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-setevent) to notify the main thread when all work is finsihed, causing the main thread to wake up again. This would effectively free up the main thread’s core to be used by one of the workers (**even allowing you to utilize one more worker thread!**). Waking the main thread is also cheap, since the core that the main thread will eventually run on, is active.
 
----
+### Implementation #3: Spinning lockless thread pool - ideal state!
+The final implementation (where workers never sleep) is well-suited to this kind of workload, aside from the main thread still spinning. 
+![Third implementation - spinning lockless thread pool](/assets/img/posts/dont_fight_your_os/spinning_lockess_thread_pool.png)
 
-The final implementation (where workers never sleep) is well-suited to this kind of workload, aside from the main thread still spinning. But again, you’d likely get similar performance by increasing per-job workload and letting each worker stay active longer.
+With this approach either the first implementation is used, where workers contest the mutex or workers are spinning *forever*. Workers always spinning is probably the ideal approach for the workload depicted in the profile graphs, namely super small jobs that frequently have to hit the job queue. Though I wonder if a hybrid of both would be even better.
 
+The workers could spin up to certain maximum and if, during that timeframe, there's still no work in the queue, you can put them to sleep until work has been added.
+Or, to put this into code:
+```c
+while(true) {
+  //spin until mMaxSpinCount is reached
+  for(int i = 0; i < mMaxSpinCount; ++i) {
+    if(mAddedTaskCount.load() > mTakenTaskCount.load()) {
+      break;
+    }
+    _mm_pause();
+  }
 
+  //sleep if no work has been added to the queue
+  if(mAddedTaskCount.load() == mTakenTaskCount.load()) {
+    std::unique_lock<std::mutex> lock(mPool->mMutex);
+    mPool->mBegin.wait(lock);
+  }
+
+  //try to get job from the job queue
+  while(mTakenTaskCount.load() < mAddedTaskCount.load()) {
+    int t = mTakenTaskCount.load();
+    if(mTakenTaskCount.compare_exchange_weak(t, t + 1)){
+      return mTasks[t];
+    }
+  }
+}
+```
+
+Now, this all being said, Dennis did an awesome job optimizing his workload for multithreading and correctly deduced the various approaches to get out of th eperformance pitfalls he's ran into. What I've written here are merely suggestions based on patterns I'm seeing in many job systems (including my own 😅). 
+
+This concludes this blogpost - if you agree/disagree or have comments, please [get in touch with me](https://bsky.app/profile/k15tech.com)
