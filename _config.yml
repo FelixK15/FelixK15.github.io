@@ -139,6 +139,8 @@ collections:
   tabs:
     output: true
     sort_by: order
+  review:
+    output: true
 
 defaults:
   - scope:
