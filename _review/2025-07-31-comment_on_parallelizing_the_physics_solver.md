@@ -5,7 +5,6 @@ tags:     programming c optimization
 category: Programming
 ---
 
-## Intro
 ![Thumbnail of the talk](/assets/img/posts/dont_fight_your_os/talk_thumbnail.png)
 
 This blog post was inspired by watching [Dennis Gustafsson's 2025 BSC talk "Parallelizing the Physics Solver"](https://www.youtube.com/watch?v=Kvsvd67XUKw).
