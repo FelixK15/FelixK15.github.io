@@ -1,6 +1,6 @@
 ---
 layout:   post
-title:    "Comment on 'Parallelizing the Physics Solver' BSC 2025 Talk"
+title:    "Multithreading in games - Comment on 'Parallelizing the Physics Solver' BSC 2025 Talk"
 tags:     programming c optimization
 category: Programming
 ---
