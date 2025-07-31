@@ -9,7 +9,7 @@
   url:  'https://mastodon.gamedev.place/@FelixK15'                  # Fill with your Mastodon account page, rel="me" will be applied for verification
 -
   type: bluesky
-  icon: 'fa-brands fa-bluesky'  # icons powered by <https://fontawesome.com/>
+  icon: 'fab fa-bluesky'  # icons powered by <https://fontawesome.com/>
   url: https://bsky.app/profile/k15tech.com
 -
   type: linkedin
