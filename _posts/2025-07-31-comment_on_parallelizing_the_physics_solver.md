@@ -100,7 +100,7 @@ Dennis correctly concludes that avoiding C-State transitions leads to a more res
 
 ![Jobs are too small](/assets/img/posts/dont_fight_your_os/scaled_first_approach.png)*Jobs seem to be way too small*
 
-Using the red `batch` bars as reference, each job seems to run for only a handfull of microseconds. **At that point, the cost of the queue access outweighs the actual job cost.** If jobs are working on isolated problems, consider batching multiple tasks per job. That way, workers stay busy longer, have to access the job queue less and thus, sleep less often.
+Using the red `batch` bars as reference, each job seems to run for only a handfull of microseconds. **At that point, the cost of the queue access outweighs the actual job cost.** If jobs are working on isolated problems, consider batching multiple tasks per job. That way, workers stay busy longer, have to access the job queue less frequently and thus, sleep less often.
 
 This is indirectly acknowledged by the decision to reduce the worker count to 8, which improved frame performance:
 ![Less cores, better performance?!](/assets/img/posts/dont_fight_your_os/core_parking_issue_2.png)*Less cores, better performance?!*
@@ -127,7 +127,7 @@ while (mFinishedTaskCount.load() < mTasks.getCount()) {
 
 ![This is fine](/assets/img/posts/dont_fight_your_os/this-is-fine.jpg)*The main thread's CPU core*
 
-Surely, there are other things that the main thread could be doing. Two possibilities are:
+Surely, there are other things that the CPU core, that the main thread is burning, could be doing. Two possibilities are:
 - Let the main thread help execute jobs until the queue is empty, and only then enter a waiting state until all workers are finished, too
 - Or actively put the main thread into a wait state until all work is done via something like [`WaitForMultipleObjects()`](https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-waitformultipleobjects), each worker could set a [windows event](https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-setevent) to notify the main thread when all work is finsihed, causing the main thread to wake up again. This would effectively free up the main thread’s core to be used by one of the workers (**even allowing you to utilize one more worker thread!**). Waking the main thread is also cheap, since the core that the main thread will eventually run on, is active.
 
@@ -137,7 +137,7 @@ The final implementation (where workers never sleep) is well-suited to this kind
 
 With this approach either the first implementation is used, where workers contest the mutex or workers are spinning *forever*. Workers always spinning is probably the ideal approach for the workload depicted in the profile graphs, namely super small jobs that frequently have to hit the job queue. Though I wonder if a hybrid of both would be even better.
 
-The workers could spin up to certain maximum and if, during that timeframe, there's still no work in the queue, you can put them to sleep until work has been added.
+The workers could spin up to a certain maximum and if, during that timeframe, there's still no work in the queue, you can put them to sleep until work has been added.
 Or, to put this into code:
 ```c
 while(true) {
