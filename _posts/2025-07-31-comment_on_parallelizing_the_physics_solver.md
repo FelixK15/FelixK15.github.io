@@ -42,7 +42,7 @@ Unfortunately, reality isn’t that simple. Windows and/or the hardware will mos
 To understand why that is, we have to consider the underlying hardware.
 
 ### P-/ vs E-Cores
-The performance measurements that are shown during that presentation were taken on an **i9-14900F Intel CPU**, which is a hybrid CPU. In practise, **this means that the CPU has 2 different cores that it's using to execute instructions**. There are **P**erformance cores and **E**fficience cores (commonly referred to as P-& E-Cores), with the general, overdramatic, consensus being that **P-Cores are fast and awesome and E-Cores are slow and lame**. While the E-Cores *are* slower, it's not "half of the performance of the P-Cores", as was stated during the talk.
+The performance measurements that are shown during that presentation were taken on an **i9-14900F Intel CPU**, which is a hybrid CPU[^1]. In practise, **this means that the CPU has 2 or more different cores that it's using to execute instructions**. For this concrete CPU, there are 2 different cores: **P**erformance cores and **E**fficience cores (commonly referred to as P-& E-Cores), with the general, overdramatic, consensus being that **P-Cores are fast and awesome and E-Cores are slow and lame**. While the E-Cores *are* slower, it's not "half of the performance of the P-Cores", as was stated during the talk.
 
 In fact, looking at [the specs for that particular CPU](https://www.intel.de/content/www/de/de/products/sku/236853/intel-core-i9-processor-14900f-36m-cache-up-to-5-80-ghz/specifications.html), in terms of base clock speed, the **E-Cores are around 75% as fast as the P-Cores**.
 
@@ -129,11 +129,11 @@ while (mFinishedTaskCount.load() < mTasks.getCount()) {
 ![This is fine](/assets/img/posts/dont_fight_your_os/this-is-fine.jpg)*The main thread's CPU core*
 
 Surely, there are other things that the main thread could be doing. Two possibilities are:
-- Let the main thread help execute jobs until the queue is empty, and only then enter a waiting state until all workers are finished, too
-- Or actively put the main thread into a wait state until all work is done via something like [`WaitForMultipleObjects()`](https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-waitformultipleobjects), each worker could set a [windows event](https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-setevent) to notify the main thread when all work is finsihed, causing the main thread to wake up again. This would effectively free up the main thread’s core to be used by one of the workers (**even allowing you to utilize one more worker thread!**). Waking the main thread is also cheap, since the core that the main thread will eventually run on, is active.
+- Let the main thread help execute jobs until the queue is empty, and only then enter a waiting state until all workers are finished
+- Or actively put the main thread into a wait state until all work is done via something like [`WaitForMultipleObjects()`](https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-waitformultipleobjects), each worker could set a [windows event](https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-setevent) to notify the main thread when all work is finished, causing the main thread to wake up again. This would effectively free up the main thread’s core to be used by one of the workers (**even allowing you to utilize one more worker thread!**). Waking the main thread is also cheap, since the core that the main thread will eventually run on, is active.
 
 ---
 
 The final implementation (where workers never sleep) is well-suited to this kind of workload, aside from the main thread still spinning. But again, you’d likely get similar performance by increasing per-job workload and letting each worker stay active longer.
 
-
+[^1]: Many CPUs these days use a hybrid architecture, like ARMs big.LITTLE architecture, which is used by most modern phones + Apple silicon.
