@@ -1,11 +1,10 @@
 ---
 layout:   post
-title:    "Comment on 'Parallelizing the Physics Solver' BSC 2025 Talk"
+title:    "Multithreading in games - Comment on 'Parallelizing the Physics Solver' BSC 2025 Talk"
 tags:     programming c optimization
 category: Programming
 ---
 
-## Intro
 ![Thumbnail of the talk](/assets/img/posts/dont_fight_your_os/talk_thumbnail.png)
 
 This blog post was inspired by watching [Dennis Gustafsson's 2025 BSC talk "Parallelizing the Physics Solver"](https://www.youtube.com/watch?v=Kvsvd67XUKw).
@@ -60,7 +59,7 @@ On Intel CPUs, the following priority system decides which CPU core to run a thr
 3. Run on an E-Core within the lowest utilized E-Core cluster, if all E-Cores are utilized,
 4. Run on P-Core SMT.
 
-So, depending on your workload, if you'd actually utilize all your cores, you could run into a scenario where the E-Cores within an E-Core cluster will trash each other's cache. Additionally, Windows will monitor the utilization of CPU cores and eventually it'll will *park* CPU cores that it feels are underutilized. ***Core Parking* is a power saving mechanism within Windows to not waster power on CPU cores that aren't doing anything**. While in theory this is a good thing, the parking and unparking of cores does come with a slight performance hit, especially if this is done *over and over* again within a single frame. 
+So, depending on your workload, if you'd actually utilize all your cores, you could run into a scenario where the E-Cores within an E-Core cluster will trash each other's cache. Additionally, Windows will monitor the utilization of CPU cores and eventually it'll *park* CPU cores that it feels are underutilized. ***Core Parking* is a power saving mechanism within Windows to not waste power on CPU cores that aren't doing anything**. While in theory this is a good thing, the parking and unparking of cores does come with a slight performance hit, especially if this is done *over and over* again within a single frame. 
 
 > *Note: Core Parking* is an optional feature which is turned on by default for the **balanced** & **power saver** power plans in Windows. I've seen many threads in the Steam Community, Reddit, etc suggesting to turn this off but if you want to ship a game on Windows I'd assume only the enthusiast go the "extra mile" of actually disabling this, meanining that you still unfortunately have to account for this. The Laptop and Windows handheld gamers will thank you for it though ;)
 
@@ -78,11 +77,11 @@ void JobSystem::spawnWorkerThreads(int threadCount) {
 }
 ```
 
-This pins each thread to one particular CPU core, which effectively means that **the thread can only be executed on that core alone**. If you consider a scenario where Windows decides to park Core#1 because nothing was happening on that core but Core#2 is still active and ready to run a thread, **Windows has no chance but to unpark Core#1 as it has to respect the hard affinty that was set using [``SetThreadAffintyMask()``](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-setthreadaffinitymask)**.
+This pins each thread to one particular CPU core, which effectively means that **the thread can only be executed on that core alone**. If you consider a scenario where a thread is pinned on eg. Core#1 and becomes active, but Windows decided to park Core#1 because nothing was happening on that core for some time, **Windows has no chance but to unpark Core#1, even if other cores would be available to run that thread, as it has to respect the hard affinity that was set using [``SetThreadAffinityMask()``](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-setthreadaffinitymask)**.
 
-The alternative of hard-affinitizing your thread is *soft affinity*, which is basically **a hint to the Windows scheduler to say 'hey, I would really like this thread to run on this class of CPU cores, but if you can't do that, feel free to ignore my hint'**. This is supported by the [EcoQoS family of APIs](https://devblogs.microsoft.com/performance-diagnostics/introducing-ecoqos/) or [CPU Set family of APUs](https://learn.microsoft.com/en-us/windows/win32/procthread/cpu-sets). EcoQoS is a hint that just differentiates between efficiency vs power. CPU sets are one level below where you can select a range of CPU cores for a given thread to run on (Windows will still ignore this if it can't find a suitable core in that range during runtime). More over, the soft-affinity functions of CPU sets should be "core parking aware", meaning that **Windows won't unpark a core if it can run on another core that's within the range of CPUs you provided**.
+The alternative of hard-affinitizing your thread is *soft affinity*, which is basically **a hint to the Windows scheduler to say 'hey, I would really like this thread to run on this class of CPU cores, but if you can't do that, feel free to ignore my hint'**. This is supported by the [EcoQoS family of APIs](https://devblogs.microsoft.com/performance-diagnostics/introducing-ecoqos/) or [CPU Set family of APIs](https://learn.microsoft.com/en-us/windows/win32/procthread/cpu-sets). EcoQoS is a hint that just differentiates between efficiency vs power. CPU sets are one level below where you can select a range of CPU cores for a given thread to run on (Windows will still ignore this if it can't find a suitable core in that range during runtime). More over, the soft-affinity functions of CPU sets should be "core parking aware", meaning that **Windows won't unpark a core if it can run on another core that's within the range of CPUs you provided**.
 
-> *Note:* While the [official recommendation](https://www.intel.com/content/www/us/en/developer/articles/technical/optimizing-threading-for-gaming-performance.html) is to use soft affinity over hard affinity, hard affinity can still be beneficial for selected use cases (ie: have a job system that only works on background tasks (tasks that don't have to be finished by the end of the CPU frame) and hard affinitize the workers on E-Cores).
+> *Note:* While the [official Intel recommendation for gaming performance](https://www.intel.com/content/www/us/en/developer/articles/technical/optimizing-threading-for-gaming-performance.html) is to use soft affinity over hard affinity, hard affinity can still be beneficial for selected use cases (ie: have a job system that only works on background tasks (tasks that don't have to be finished by the end of the CPU frame) and hard affinitize the workers on E-Cores).
 
 ### Implementation #1: Sync primitives — keep the cores awake!
 But now lets focus on the content of the talk again. Based on the initial implementation shown in the talk, workers go to sleep as soon as the job queue is empty. If no other thread needs that core, the CPU enters a [C-State](https://edc.intel.com/content/www/us/en/design/products/platforms/details/raptor-lake-s/13th-generation-core-processors-datasheet-volume-1-of-2/003/package-c-states/). The deeper the C-State, the longer the wake-up time — and at certain levels, the core's cache is flushed too. **In that case, you'll end up paying twice: once to wake the core, and again to repopulate the cache.**
@@ -101,14 +100,14 @@ Dennis correctly concludes that avoiding C-State transitions leads to a more res
 
 ![Jobs are too small](/assets/img/posts/dont_fight_your_os/scaled_first_approach.png)*Jobs seem to be way too small*
 
-Using the red `batch` bars as reference, each job seems to run for only a handfull of microseconds. **At that point, the cost of the queue access outweighs the actual job cost.** If jobs are working on isolated problems, consider batching multiple tasks per job. That way, workers stay busy longer, have to access the job queue less and thus, sleep less often.
+Using the red `batch` bars as reference, each job seems to run for only a handfull of microseconds. **At that point, the cost of the queue access outweighs the actual job cost.** If jobs are working on isolated problems, consider batching multiple tasks per job. That way, workers stay busy longer, have to access the job queue less frequently and thus, sleep less often.
 
 This is indirectly acknowledged by the decision to reduce the worker count to 8, which improved frame performance:
 ![Less cores, better performance?!](/assets/img/posts/dont_fight_your_os/core_parking_issue_2.png)*Less cores, better performance?!*
 
 As Dennis points out, this likely limits execution to P-Cores only. He’s right that Windows favors P-Cores when scheduling. However, **this accounts for only a tiny fraction of the performance gain**. The bigger win comes from higher per-thread utilization.
 
-### Implementation #2: Lockless thread pool — or the wasted core
+### Implementation #2: Lockless thread pool — the burning core!
 Dennis correctly identifies the issue of workers sleeping between jobs because of the high contention of the job queue mutex and switches to a spin-wait strategy to keep cores active until the work is done.
 
 The revised implementation:
@@ -131,9 +130,44 @@ while (mFinishedTaskCount.load() < mTasks.getCount()) {
 Surely, there are other things that the main thread could be doing. Two possibilities are:
 - Let the main thread help execute jobs until the queue is empty, and only then enter a waiting state until all workers are finished
 - Or actively put the main thread into a wait state until all work is done via something like [`WaitForMultipleObjects()`](https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-waitformultipleobjects), each worker could set a [windows event](https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-setevent) to notify the main thread when all work is finished, causing the main thread to wake up again. This would effectively free up the main thread’s core to be used by one of the workers (**even allowing you to utilize one more worker thread!**). Waking the main thread is also cheap, since the core that the main thread will eventually run on, is active.
+Surely, there are other things that the CPU core, that the main thread is burning, could be doing. Two possibilities are:
+- Let the main thread help execute jobs until the queue is empty, and only then enter a waiting state until all workers are finished, too
+- Or actively put the main thread into a wait state until all work is done via something like [`WaitForMultipleObjects()`](https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-waitformultipleobjects), each worker could set a [windows event](https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-setevent) to notify the main thread when all work is finsihed, causing the main thread to wake up again. This would effectively free up the main thread’s core to be used by one of the workers (**even allowing you to utilize one more worker thread!**). Waking the main thread is also cheap, since the core that the main thread will eventually run on, is active.
 
----
+### Implementation #3: Spinning lockless thread pool - ideal state!
+The final implementation (where workers never sleep) is well-suited to this kind of workload, aside from the main thread still spinning. 
+![Third implementation - spinning lockless thread pool](/assets/img/posts/dont_fight_your_os/spinning_lockess_thread_pool.png)
 
-The final implementation (where workers never sleep) is well-suited to this kind of workload, aside from the main thread still spinning. But again, you’d likely get similar performance by increasing per-job workload and letting each worker stay active longer.
+With this approach either the first implementation is used, where workers contest the mutex or workers are spinning *forever*. Workers always spinning is probably the ideal approach for the workload depicted in the profile graphs, namely super small jobs that frequently have to hit the job queue. Though I wonder if a hybrid of both would be even better.
 
-[^1]: Many CPUs these days use a hybrid architecture, like ARMs big.LITTLE architecture, which is used by most modern phones + Apple silicon.
+The workers could spin up to a certain maximum and if, during that timeframe, there's still no work in the queue, you can put them to sleep until work has been added.
+Or, to put this into code:
+```c
+while(true) {
+  //spin until mMaxSpinCount is reached
+  for(int i = 0; i < mMaxSpinCount; ++i) {
+    if(mAddedTaskCount.load() > mTakenTaskCount.load()) {
+      break;
+    }
+    _mm_pause();
+  }
+
+  //sleep if no work has been added to the queue
+  if(mAddedTaskCount.load() == mTakenTaskCount.load()) {
+    std::unique_lock<std::mutex> lock(mPool->mMutex);
+    mPool->mBegin.wait(lock);
+  }
+
+  //try to get job from the job queue
+  while(mTakenTaskCount.load() < mAddedTaskCount.load()) {
+    int t = mTakenTaskCount.load();
+    if(mTakenTaskCount.compare_exchange_weak(t, t + 1)){
+      return mTasks[t];
+    }
+  }
+}
+```
+
+Now, this all being said, **Dennis did an awesome job optimizing his workload for multithreading and correctly deduced the various approaches to get out of the performance pitfalls he's ran into**. What I've written here are merely suggestions based on patterns I'm seeing in many job systems (including my own 😅). 
+
+This concludes this blogpost - if you agree/disagree or have comments, please [get in touch with me](https://bsky.app/profile/k15tech.com)

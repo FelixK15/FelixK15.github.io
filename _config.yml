@@ -34,9 +34,6 @@ url: 'https://FelixK15.github.io'
 github:
   username: FelixK15             # change to your github username
 
-twitter:
-  username: FelixK_15            # change to your twitter username
-
 social:
   # Change to your full name.
   # It will be displayed as the default author of the posts and the copyright owner in the Footer
@@ -47,6 +44,7 @@ social:
     - https://twitter.com/FelixK_15      # change to your twitter homepage
     - https://github.com/FelixK15       # change to your github homepage
     - https://mastodon.gamedev.place/@FelixK15
+    - https://bsky.app/profile/k15tech.com
     # Uncomment below to add more social links
     # - https://www.facebook.com/username
     # - https://www.linkedin.com/in/username
@@ -84,7 +82,7 @@ theme_mode: dark  # [light|dark]
 img_cdn:
 
 # the avatar on sidebar, support local or CORS resources
-avatar: https://avatars.githubusercontent.com/FelixK15
+avatar: /assets/img/avatar/avatar.png
 
 # boolean type, the global switch for ToC in posts.
 toc: true
@@ -139,6 +137,8 @@ collections:
   tabs:
     output: true
     sort_by: order
+  review:
+    output: true
 
 defaults:
   - scope:
