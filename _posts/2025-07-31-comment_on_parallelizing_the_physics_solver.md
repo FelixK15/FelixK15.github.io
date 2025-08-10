@@ -171,3 +171,5 @@ while(true) {
 Now, this all being said, **Dennis did an awesome job optimizing his workload for multithreading and correctly deduced the various approaches to get out of the performance pitfalls he's ran into**. What I've written here are merely suggestions based on patterns I'm seeing in many job systems (including my own 😅). 
 
 This concludes this blogpost - if you agree/disagree or have comments, please [get in touch with me](https://bsky.app/profile/k15tech.com)
+
+[^1]: Many CPUs these days use a hybrid architecture, like [ARMs big.LITTLE](https://www.arm.com/technologies/big-little) architecture, which is used by most modern phones + Apple silicon.
