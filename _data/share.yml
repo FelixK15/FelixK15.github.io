@@ -13,5 +13,5 @@ platforms:
   -
     type: BlueSky
     icon: "fab fa-bluesky"
-    link: "https://bsky.app/intent/compose?text=TITLE-URL"
+    link: "https://bsky.app/intent/compose?text=TITLE%20URL"
   -
