@@ -106,6 +106,6 @@ Excerpt of the information inside `state.json` that probably most users are inte
  }
 ```
 
-You can then use this information to resolve the path to `cl.exe` (or any `link.exe`/`lib.exe` you'd like) by checking the toolchain version inside `VC\Auxiliary\Build\Microsoft.VCToolsVersion.default.txt` and using that version to get to the final path by resolving `\VC\Tools\MSVC\{ToolchainVersion}\bin\Hostx64\x64\cl.exe` (assuming you want to compile a 64Bit binary on a 64Bit host). Theoretically, the code for this should be rather small compared to the ~500kb that's *vswhere*, with the json parser probably taking up most of that (but since you know the layout of the json file beforehand, even that could be optimized - **A full-blown general purpose json parser isn't necessarily needed here IMHO**).
+You can then use this information to resolve the path to `cl.exe` (or `link.exe`/`lib.exe`) by checking the toolchain version inside `VC\Auxiliary\Build\Microsoft.VCToolsVersion.default.txt` and using that version to get to the final path by resolving `\VC\Tools\MSVC\{ToolchainVersion}\bin\Hostx64\x64\cl.exe` (assuming you want to compile a 64Bit binary on a 64Bit host). Theoretically, the code for this should be rather small compared to the ~500kb that's *vswhere*, with the json parser probably taking up most of that (but since you know the layout of the json file beforehand, even that could be optimized - **A full-blown general purpose json parser isn't necessarily needed here IMHO**).
 
 Anyway, that's it for now.
