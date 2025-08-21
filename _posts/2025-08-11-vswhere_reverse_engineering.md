@@ -9,7 +9,7 @@ category: Programming
 
 I'm currently prototyping a Windows C/C++ build system for my personal toy projects with the goal of having a very small, self-contained and portable build system that I can quickly add to projects. The build system reads one or more configuration files, resolves some paths and call the various compiler/linker executables - pretty standard stuff.
 
-I don't want to go into too much detail about the build system in this post, but **I do want to talk about a problem that probably everybody ran into who built a build system for Windows applications before**. The problem: **How to get the path to cl.exe and link.exe?**.
+I don't want to go into too much detail about the build system in this post, but **I do want to talk about a problem that probably everybody ran into who built a build system for Windows applications before**. The problem: **How to get the path to cl.exe, link.exe & lib.exe?**.
 
 Since Visual Studio 2017, Microsoft ships *vswhere* for exactly this. For those of you, who don't know what *vswhere* is: ***vswhere* is a standalone command-line tool that you can use to get the path to all your local Visual Studio installations**. In case of multiple Visual Studio installations (eg: if you have Visual Studio 2017 and Visual Studio 2022 installed), you can even supply a filter and tell it to only return the instance of Visual Studio that matches your filter (eg: "only list the instances that I can build C# projects with").
 
@@ -106,6 +106,6 @@ Excerpt of the information inside `state.json` that probably most users are inte
  }
 ```
 
-You can then use this information to resolve the path to `cl.exe` (or any other tool you'd like). Theoretically, the code for this should be rather small compared to the ~500kb that's *vswhere*, with the json parser probably taking up most of that (but since you know the layout of the json file beforehand, even that could be optimized - **A full-blown general purpose json parser isn't necessarily needed here IMHO**).
+You can then use this information to resolve the path to `cl.exe` (or any `link.exe`/`lib.exe` you'd like) by checking the toolchain version inside `VC\Auxiliary\Build\Microsoft.VCToolsVersion.default.txt` and using that version to get to the final path by resolving `\VC\Tools\MSVC\{ToolchainVersion}\bin\Hostx64\x64\cl.exe` (assuming you want to compile a 64Bit binary on a 64Bit host). Theoretically, the code for this should be rather small compared to the ~500kb that's *vswhere*, with the json parser probably taking up most of that (but since you know the layout of the json file beforehand, even that could be optimized - **A full-blown general purpose json parser isn't necessarily needed here IMHO**).
 
 Anyway, that's it for now.
